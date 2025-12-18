@@ -1,6 +1,31 @@
 name: Hotfix Start (Gitflow)
 
 on:
+  workflow_call:
+    inputs:
+      hotfix_version:
+        description: 'Hotfix version (e.g., 2.0.15.1 or leave empty to auto-increment patch)'
+        required: false
+        type: string
+      base_tag:
+        description: 'Base tag to create hotfix from (e.g., v2.0.15). Leave empty to use latest main.'
+        required: false
+        type: string
+      runner:
+        description: 'Runner to use for jobs'
+        required: false
+        type: string
+        default: "ubuntu-24.04"
+      java_version:
+        description: 'Java version to use'
+        required: false
+        type: number
+        default: 21
+      java_distribution:
+        description: 'Java distribution to use'
+        required: false
+        type: string
+        default: "liberica"
   workflow_dispatch:
     inputs:
       hotfix_version:
@@ -14,7 +39,7 @@ on:
 
 jobs:
   hotfix-start:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,8 +54,8 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: 21
-          distribution: liberica
+          java-version: ${{ inputs.java_version || 21 }}
+          distribution: ${{ inputs.java_distribution || 'liberica' }}
 
       - name: Get current version
         id: get_version
