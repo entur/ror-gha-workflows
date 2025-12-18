@@ -1,0 +1,101 @@
+name: JReleaser Maven Central Release
+description: Handles JReleaser configuration, staging, and release to Maven Central
+inputs:
+  version:
+    description: "The version to release"
+    required: true
+  version_tag_prefix:
+    description: "The prefix for the git tag"
+    required: false
+    default: "v"
+  github_token:
+    description: "GitHub token for JReleaser"
+    required: true
+  sonatype_username:
+    description: "Sonatype username"
+    required: true
+  sonatype_password:
+    description: "Sonatype password/token"
+    required: true
+  gpg_public_key:
+    description: "Base64-encoded GPG public key"
+    required: true
+  gpg_secret_key:
+    description: "Base64-encoded GPG secret key"
+    required: true
+  gpg_passphrase:
+    description: "GPG key passphrase"
+    required: true
+  artifactory_user:
+    description: "JFrog Artifactory user (optional)"
+    required: false
+    default: ""
+  artifactory_token:
+    description: "JFrog Artifactory token (optional)"
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: "The version that was released"
+    value: ${{ steps.release.outputs.version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate JReleaser Maven Central Config
+      shell: bash
+      env:
+        GHA_MAVENCENTRAL_GITHUB_TOKEN: ${{ inputs.github_token }}
+        GHA_MAVENCENTRAL_SONATYPE_USERNAME: ${{ inputs.sonatype_username }}
+        GHA_MAVENCENTRAL_SONATYPE_PASSWORD: ${{ inputs.sonatype_password }}
+        GHA_MAVENCENTRAL_GPG_PUBLIC_KEY: ${{ inputs.gpg_public_key }}
+        GHA_MAVENCENTRAL_GPG_SECRET_KEY: ${{ inputs.gpg_secret_key }}
+        GHA_MAVENCENTRAL_GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+      run: |
+        mkdir -p $HOME/.jreleaser
+        cat << EOF >>$HOME/.jreleaser/config.toml
+        JRELEASER_GITHUB_TOKEN="$GHA_MAVENCENTRAL_GITHUB_TOKEN"
+        JRELEASER_NEXUS2_USERNAME="$GHA_MAVENCENTRAL_SONATYPE_USERNAME"
+        JRELEASER_NEXUS2_PASSWORD="$GHA_MAVENCENTRAL_SONATYPE_PASSWORD"
+        JRELEASER_MAVENCENTRAL_USERNAME="$GHA_MAVENCENTRAL_SONATYPE_USERNAME"
+        JRELEASER_MAVENCENTRAL_PASSWORD="$GHA_MAVENCENTRAL_SONATYPE_PASSWORD"
+        JRELEASER_GPG_PASSPHRASE="$GHA_MAVENCENTRAL_GPG_PASSPHRASE"
+        JRELEASER_GPG_PUBLIC_KEY="""$(echo "$GHA_MAVENCENTRAL_GPG_PUBLIC_KEY" | base64 --decode)"""
+        JRELEASER_GPG_SECRET_KEY="""$(echo "$GHA_MAVENCENTRAL_GPG_SECRET_KEY" | base64 --decode)"""
+        EOF
+
+    - name: Verify JReleaser Config
+      shell: bash
+      env:
+        GHA_MAVENCENTRAL_VERSION: ${{ inputs.version }}
+        GHA_TAG_PREFIX: ${{ inputs.version_tag_prefix }}
+        JFROG_USER: ${{ inputs.artifactory_user }}
+        JFROG_PASS: ${{ inputs.artifactory_token }}
+      run: |
+        mvn --non-recursive -B -Ppublication jreleaser:config -Djreleaser.tag.name=${GHA_TAG_PREFIX}${GHA_MAVENCENTRAL_VERSION}
+
+    - name: JReleaser stage
+      id: stage
+      shell: bash
+      env:
+        GHA_MAVENCENTRAL_VERSION: ${{ inputs.version }}
+        GHA_TAG_PREFIX: ${{ inputs.version_tag_prefix }}
+        JFROG_USER: ${{ inputs.artifactory_user }}
+        JFROG_PASS: ${{ inputs.artifactory_token }}
+      run: |
+        mvn -B -Ppublication deploy -Djreleaser.tag.name=${GHA_TAG_PREFIX}${GHA_MAVENCENTRAL_VERSION}
+
+    - name: JReleaser release
+      id: release
+      shell: bash
+      env:
+        GHA_MAVENCENTRAL_VERSION: ${{ inputs.version }}
+        GHA_TAG_PREFIX: ${{ inputs.version_tag_prefix }}
+        JFROG_USER: ${{ inputs.artifactory_user }}
+        JFROG_PASS: ${{ inputs.artifactory_token }}
+      run: |
+        mvn --non-recursive -B -Ppublication jreleaser:full-release -Djreleaser.tag.name=${GHA_TAG_PREFIX}${GHA_MAVENCENTRAL_VERSION}
+
+        echo ":tada: Published $GHA_MAVENCENTRAL_VERSION to Maven Central." >> $GITHUB_STEP_SUMMARY
+        echo "version=$GHA_MAVENCENTRAL_VERSION" >> $GITHUB_OUTPUT
