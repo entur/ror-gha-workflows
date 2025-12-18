@@ -7,8 +7,8 @@ on:
         description: 'Hotfix branch to finish (e.g., hotfix/2.0.16.1)'
         required: true
         type: string
-      merge_to_master:
-        description: 'Cherry-pick hotfix commits to master'
+      merge_to_main:
+        description: 'Cherry-pick hotfix commits to base branch'
         required: false
         type: boolean
         default: true
@@ -42,6 +42,11 @@ on:
         required: false
         type: string
         default: ""
+      base_branch:
+        description: 'Base branch to cherry-pick changes to (e.g., main, master, develop)'
+        required: false
+        type: string
+        default: "main"
     secrets:
       SONATYPE_AUTH_USER:
         required: true
@@ -59,11 +64,16 @@ on:
         description: 'Hotfix branch to finish (e.g., hotfix/2.0.16.1)'
         required: true
         type: string
-      merge_to_master:
-        description: 'Cherry-pick hotfix commits to master'
+      merge_to_main:
+        description: 'Cherry-pick hotfix commits to base branch'
         required: false
         type: boolean
         default: true
+      base_branch:
+        description: 'Base branch to cherry-pick changes to (e.g., main, master, develop)'
+        required: false
+        type: string
+        default: "main"
 
 jobs:
   get-hotfix-version:
@@ -151,15 +161,15 @@ jobs:
           gpg_secret_key: ${{ secrets.SONATYPE_GPG_KEY }}
           gpg_passphrase: ${{ secrets.SONATYPE_GPG_KEY_PASSWORD }}
 
-  merge-to-master:
-    name: Cherry-pick hotfix to master
+  merge-to-base-branch:
+    name: Cherry-pick hotfix to base branch
     needs: [get-hotfix-version, publish-hotfix]
-    if: inputs.merge_to_master == true
+    if: inputs.merge_to_main == true
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: master
+          ref: ${{ inputs.base_branch || 'main' }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -171,13 +181,14 @@ jobs:
       - name: Cherry-pick hotfix commits
         run: |
           HOTFIX_BRANCH="${{ inputs.hotfix_branch }}"
-          echo "Cherry-picking commits from $HOTFIX_BRANCH to master"
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+          echo "Cherry-picking commits from $HOTFIX_BRANCH to $BASE_BRANCH"
 
           # Get the base commit (where hotfix branched from)
           git fetch origin "$HOTFIX_BRANCH"
 
           # Find all commits in the hotfix branch
-          HOTFIX_COMMITS=$(git log --reverse --pretty=format:"%H" origin/$HOTFIX_BRANCH --not $(git merge-base origin/master origin/$HOTFIX_BRANCH))
+          HOTFIX_COMMITS=$(git log --reverse --pretty=format:"%H" origin/$HOTFIX_BRANCH --not $(git merge-base origin/$BASE_BRANCH origin/$HOTFIX_BRANCH))
 
           # Cherry-pick each commit
           for commit in $HOTFIX_COMMITS; do
@@ -189,9 +200,10 @@ jobs:
             }
           done
 
-      - name: Push to master
+      - name: Push to base branch
         run: |
-          git push origin master
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+          git push origin "$BASE_BRANCH"
 
       - name: Delete hotfix branch
         continue-on-error: true
@@ -223,9 +235,11 @@ jobs:
             done
           fi
 
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           - **Hotfix Branch:** Deleted
-          - **Merged to Master:** ${{ inputs.merge_to_master }}
+          - **Merged to $BASE_BRANCH:** ${{ inputs.merge_to_main }}
 
           The hotfix has been published to Maven Central.
           EOF

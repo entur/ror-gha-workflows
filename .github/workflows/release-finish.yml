@@ -8,12 +8,12 @@ on:
         required: true
         type: string
       next_version_increment:
-        description: 'Next version increment type for master'
+        description: 'Next version increment type for main'
         required: false
         type: string
         default: 'minor'
       next_version:
-        description: 'Or specify exact next version for master (e.g., 2.1.0-SNAPSHOT)'
+        description: 'Or specify exact next version for main (e.g., 2.1.0-SNAPSHOT)'
         required: false
         type: string
       runner:
@@ -46,6 +46,11 @@ on:
         required: false
         type: string
         default: ""
+      base_branch:
+        description: 'Base branch to merge changes back to (e.g., main, master, develop)'
+        required: false
+        type: string
+        default: "main"
     secrets:
       SONATYPE_AUTH_USER:
         required: true
@@ -64,7 +69,7 @@ on:
         required: true
         type: string
       next_version_increment:
-        description: 'Next version increment type for master'
+        description: 'Next version increment type for main'
         required: false
         type: choice
         default: 'minor'
@@ -73,9 +78,14 @@ on:
           - minor
           - patch
       next_version:
-        description: 'Or specify exact next version for master (e.g., 2.1.0-SNAPSHOT)'
+        description: 'Or specify exact next version for main (e.g., 2.1.0-SNAPSHOT)'
         required: false
         type: string
+      base_branch:
+        description: 'Base branch to merge changes back to (e.g., main, master, develop)'
+        required: false
+        type: string
+        default: "main"
 
 jobs:
   get-release-version:
@@ -163,14 +173,14 @@ jobs:
           gpg_secret_key: ${{ secrets.SONATYPE_GPG_KEY }}
           gpg_passphrase: ${{ secrets.SONATYPE_GPG_KEY_PASSWORD }}
 
-  update-master:
-    name: Update master to next SNAPSHOT version
+  update-base-branch:
+    name: Update base branch to next SNAPSHOT version
     needs: [get-release-version, publish-release]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: master
+          ref: ${{ inputs.base_branch || 'main' }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -206,16 +216,17 @@ jobs:
           echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
           echo "Next development version: $NEXT_VERSION"
 
-      - name: Update master version
+      - name: Update base branch version
         run: |
           NEXT_VERSION="${{ steps.next_version.outputs.next_version }}"
-          echo "Updating master to: $NEXT_VERSION"
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+          echo "Updating $BASE_BRANCH to: $NEXT_VERSION"
 
           mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false -DprocessAllModules=true
 
           git add '*/pom.xml' pom.xml
           git commit -m "chore: prepare for next development iteration $NEXT_VERSION [skip ci]"
-          git push origin master
+          git push origin "$BASE_BRANCH"
 
       - name: Delete release branch
         continue-on-error: true
@@ -247,9 +258,11 @@ jobs:
             done
           fi
 
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+
           cat >> $GITHUB_STEP_SUMMARY <<EOF
-          - **Next Development Version (master):** ${{ steps.next_version.outputs.next_version }}
+          - **Next Development Version ($BASE_BRANCH):** ${{ steps.next_version.outputs.next_version }}
           - **Release Branch:** Deleted
 
-          The release has been published to Maven Central and master branch has been updated to the next development version.
+          The release has been published to Maven Central and $BASE_BRANCH branch has been updated to the next development version.
           EOF

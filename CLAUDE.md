@@ -18,10 +18,10 @@ This repository provides **reusable GitHub Actions workflows for Maven/Java proj
 ```
 .github/
 ├── workflows/                  # Reusable GitHub Actions workflows
-│   ├── release-start.yml      # Create release branch from master
-│   ├── release-finish.yml     # Tag, publish, update master (REUSABLE)
+│   ├── release-start.yml      # Create release branch from main
+│   ├── release-finish.yml     # Tag, publish, update main (REUSABLE)
 │   ├── hotfix-start.yml       # Create hotfix branch from tag
-│   ├── hotfix-finish.yml      # Tag, publish, cherry-pick to master (REUSABLE)
+│   ├── hotfix-finish.yml      # Tag, publish, cherry-pick to main (REUSABLE)
 │   ├── release-manual.yml     # Manual release fallback
 │   └── hotfix-manual.yml      # Manual hotfix fallback
 ├── actions/                    # Composite actions
@@ -39,14 +39,14 @@ This repository provides **reusable GitHub Actions workflows for Maven/Java proj
 ### Release Process
 
 1. **Start Release** (`release-start.yml`):
-   - Creates `release/X.Y.Z` branch from `master`
+   - Creates `release/X.Y.Z` branch from `main`
    - Sets version in pom.xml to `X.Y.Z-SNAPSHOT`
 
 2. **Finish Release** (`release-finish.yml`):
    - Removes `-SNAPSHOT` from pom.xml
    - Creates git tag (e.g., `v2.0.16`)
    - Publishes to Maven Central
-   - Updates `master` to next development version (e.g., `2.1.0-SNAPSHOT`)
+   - Updates `main` to next development version (e.g., `2.1.0-SNAPSHOT`)
    - Deletes release branch
 
 ### Hotfix Process
@@ -59,7 +59,7 @@ This repository provides **reusable GitHub Actions workflows for Maven/Java proj
    - Removes `-SNAPSHOT` from pom.xml
    - Creates git tag (e.g., `v2.0.16.1`)
    - Publishes to Maven Central
-   - Cherry-picks commits to `master` (optional)
+   - Cherry-picks commits to `main` (optional)
    - Deletes hotfix branch
 
 ## Using as Reusable Workflows
@@ -83,6 +83,7 @@ jobs:
     with:
       release_branch: ${{ github.event.inputs.release_branch }}
       next_version_increment: 'minor'  # or 'major', 'patch'
+      base_branch: 'main'  # or 'master', 'develop', etc.
       runner: 'ubuntu-24.04'
       java_version: 21
       java_distribution: 'liberica'
@@ -113,7 +114,8 @@ jobs:
     uses: your-org/ror-gha-workflows/.github/workflows/hotfix-finish.yml@main
     with:
       hotfix_branch: ${{ github.event.inputs.hotfix_branch }}
-      merge_to_master: true
+      merge_to_main: true
+      base_branch: 'main'  # or 'master', 'develop', etc.
       runner: 'ubuntu-24.04'
       java_version: 21
       java_distribution: 'liberica'
@@ -138,6 +140,7 @@ jobs:
 | `java_version` | number | No | `21` | Java version for builds |
 | `java_distribution` | string | No | `liberica` | Java distribution (liberica, temurin, etc.) |
 | `version_tag_prefix` | string | No | `v` | Prefix for git tags (e.g., "v" creates "v2.0.16") |
+| `base_branch` | string | No | `main` | Base development branch (main, master, develop, etc.) |
 | `artifact_group_id` | string | No | `""` | Maven group ID for summary links |
 | `artifact_ids` | string | No | `""` | Comma-separated artifact IDs for summary links |
 
@@ -154,7 +157,7 @@ jobs:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `hotfix_branch` | string | Yes | - | Hotfix branch to finish (e.g., `hotfix/2.0.16.1`) |
-| `merge_to_master` | boolean | No | `true` | Cherry-pick hotfix commits to master |
+| `merge_to_main` | boolean | No | `true` | Cherry-pick hotfix commits to base branch |
 
 ## Required Secrets
 
@@ -261,12 +264,12 @@ Updates Maven pom.xml versions using `mvn versions:set`.
 
 ### Cherry-pick Conflicts in Hotfix
 
-**Problem:** Merge to master fails with conflicts.
+**Problem:** Merge to main fails with conflicts.
 
 **Solution:**
-- Set `merge_to_master: false` to skip automatic merge
+- Set `merge_to_main: false` to skip automatic merge
 - Manually cherry-pick commits after hotfix is published
-- Resolve conflicts locally and push to master
+- Resolve conflicts locally and push to main
 
 ### Version Mismatch
 

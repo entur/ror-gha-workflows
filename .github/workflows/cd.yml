@@ -2,7 +2,7 @@ name: RoR/Maven-Central/CD
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   release:

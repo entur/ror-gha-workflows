@@ -46,6 +46,7 @@ jobs:
     with:
       release_branch: ${{ github.event.inputs.release_branch }}
       next_version_increment: ${{ github.event.inputs.next_version_increment }}
+      base_branch: 'main'  # or 'master', 'develop', etc.
       runner: 'ubuntu-24.04'
       java_version: 21
       java_distribution: 'liberica'
@@ -72,8 +73,8 @@ on:
       hotfix_branch:
         description: 'Hotfix branch (e.g., hotfix/2.0.16.1)'
         required: true
-      merge_to_master:
-        description: 'Cherry-pick commits to master'
+      merge_to_main:
+        description: 'Cherry-pick commits to main'
         required: true
         default: true
         type: boolean
@@ -83,7 +84,8 @@ jobs:
     uses: your-org/ror-gha-workflows/.github/workflows/hotfix-finish.yml@main
     with:
       hotfix_branch: ${{ github.event.inputs.hotfix_branch }}
-      merge_to_master: ${{ github.event.inputs.merge_to_master }}
+      merge_to_main: ${{ github.event.inputs.merge_to_main }}
+      base_branch: 'main'  # or 'master', 'develop', etc.
       runner: 'ubuntu-24.04'
       java_version: 21
       java_distribution: 'liberica'
@@ -102,13 +104,13 @@ jobs:
 
 ### Release Process
 
-1. **Start Release**: Creates `release/X.Y.Z` branch from `master` with version `X.Y.Z-SNAPSHOT`
+1. **Start Release**: Creates `release/X.Y.Z` branch from `main` with version `X.Y.Z-SNAPSHOT`
 2. **Develop**: Make changes, test, and commit on release branch
 3. **Finish Release**:
    - Removes `-SNAPSHOT` suffix
    - Creates git tag (e.g., `v2.0.16`)
    - Publishes to Maven Central
-   - Updates `master` to next development version
+   - Updates `main` to next development version
    - Deletes release branch
 
 ### Hotfix Process
@@ -119,7 +121,7 @@ jobs:
    - Removes `-SNAPSHOT` suffix
    - Creates git tag (e.g., `v2.0.16.1`)
    - Publishes to Maven Central
-   - Cherry-picks commits to `master` (optional)
+   - Cherry-picks commits to `main` (optional)
    - Deletes hotfix branch
 
 ## Workflow Parameters
@@ -132,6 +134,7 @@ jobs:
 | `java_version` | number | `21` | Java version for builds |
 | `java_distribution` | string | `liberica` | Java distribution (liberica, temurin, etc.) |
 | `version_tag_prefix` | string | `v` | Prefix for git tags |
+| `base_branch` | string | `main` | Base development branch (main, master, develop, etc.) |
 | `artifact_group_id` | string | `""` | Maven group ID for summary links |
 | `artifact_ids` | string | `""` | Comma-separated artifact IDs |
 
@@ -148,7 +151,7 @@ jobs:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `hotfix_branch` | string | Yes | - | Hotfix branch (e.g., `hotfix/2.0.16.1`) |
-| `merge_to_master` | boolean | No | `true` | Cherry-pick commits to master |
+| `merge_to_main` | boolean | No | `true` | Cherry-pick commits to base branch |
 
 ## Required Secrets
 
@@ -244,9 +247,9 @@ git push origin :refs/tags/v2.0.16
 
 ### Cherry-pick Conflicts
 
-- Set `merge_to_master: false` to skip automatic merge
+- Set `merge_to_main: false` to skip automatic merge
 - Manually cherry-pick commits after hotfix is published
-- Resolve conflicts locally and push to master
+- Resolve conflicts locally and push to main
 
 ## Best Practices
 

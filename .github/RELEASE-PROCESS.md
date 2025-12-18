@@ -18,11 +18,11 @@ This solution replaces the traditional **gitflow-maven-plugin** approach with Gi
 
 | File | Purpose | Trigger |
 |------|---------|---------|
-| `.github/workflows/deploy.yml` | Build, test, publish SNAPSHOT from master | Push/PR to master |
-| `.github/workflows/release-start.yml` | Create release branch from master | Manual |
-| `.github/workflows/release-finish.yml` | Tag, publish, update master | Manual |
+| `.github/workflows/deploy.yml` | Build, test, publish SNAPSHOT from main | Push/PR to main |
+| `.github/workflows/release-start.yml` | Create release branch from main | Manual |
+| `.github/workflows/release-finish.yml` | Tag, publish, update main | Manual |
 | `.github/workflows/hotfix-start.yml` | Create hotfix branch from tag | Manual |
-| `.github/workflows/hotfix-finish.yml` | Tag, publish hotfix, cherry-pick to master | Manual |
+| `.github/workflows/hotfix-finish.yml` | Tag, publish hotfix, cherry-pick to main | Manual |
 | `.github/workflows/release.yml` | Fallback manual release (legacy) | Tag push or manual |
 | `.github/workflows/release-hotfix.yml` | Fallback manual hotfix (legacy) | Tag push or manual |
 
@@ -38,7 +38,7 @@ This solution replaces the traditional **gitflow-maven-plugin** approach with Gi
 ###1. Normal Development (Master Branch)
 
 ```
-master (2.0.17-SNAPSHOT)
+main (2.0.17-SNAPSHOT)
   ├─ feature/new-feature
   ├─ bugfix/issue-123
   └─ ... continuous development
@@ -46,13 +46,13 @@ master (2.0.17-SNAPSHOT)
 
 **Process:**
 ```bash
-# Develop on master or feature branches
+# Develop on main or feature branches
 git checkout -b feature/my-feature
 git add .
 git commit -m "Add new feature"
 git push
 
-# PR to master → CI runs → SNAPSHOT published to Maven Central
+# PR to main → CI runs → SNAPSHOT published to Maven Central
 ```
 
 ---
@@ -65,7 +65,7 @@ git push
 
 **Inputs:**
 - Release version: `2.0.17` (or leave empty)
-- Base branch: `master`
+- Base branch: `main`
 
 **Result:**
 - Creates `release/2.0.17` branch
@@ -91,7 +91,7 @@ git push
 **Result:**
 1. ✅ Tags `v2.0.17` from release branch
 2. ✅ Publishes `2.0.17` to Maven Central
-3. ✅ Updates master to `2.0.18-SNAPSHOT` (or `2.1.0-SNAPSHOT`)
+3. ✅ Updates main to `2.0.18-SNAPSHOT` (or `2.1.0-SNAPSHOT`)
 4. ✅ Deletes `release/2.0.17` branch
 
 ---
@@ -126,12 +126,12 @@ git push
 
 **Inputs:**
 - Hotfix branch: `hotfix/2.0.16.1`
-- Merge to master: `true` (cherry-pick hotfix to master)
+- Merge to main: `true` (cherry-pick hotfix to main)
 
 **Result:**
 1. ✅ Tags `v2.0.16.1` from hotfix branch
 2. ✅ Publishes `2.0.16.1` to Maven Central
-3. ✅ Cherry-picks hotfix commits to master
+3. ✅ Cherry-picks hotfix commits to main
 4. ✅ Deletes `hotfix/2.0.16.1` branch
 
 ---
@@ -145,7 +145,7 @@ git push
 | `mvn gitflow:hotfix-start -DhotfixVersion=2.0.16.1` | GitHub Actions → Hotfix Start |
 | `mvn gitflow:hotfix-finish` | GitHub Actions → Hotfix Finish |
 | Local Maven execution | Cloud-based GitHub Actions |
-| develop branch | master branch (simplified) |
+| develop branch | main branch (simplified) |
 | Manual Maven commands | Automated workflows |
 | No CI/CD integration | Full CI/CD with Maven Central publishing |
 
@@ -159,7 +159,7 @@ git push
 - Continuous integration with snapshot publishing
 
 ### Release Branches (`release/*`)
-- Created from master
+- Created from main
 - Version without SNAPSHOT (e.g., `2.0.17`)
 - Tagged and published
 - Deleted after release
@@ -206,7 +206,7 @@ git push
                │ [2] Release Finish
                │     - Tag v2.0.17
                │     - Publish to Maven Central
-               │     - Update master to 2.0.18-SNAPSHOT
+               │     - Update main to 2.0.18-SNAPSHOT
                │     - Delete release branch
                ↓
                🎉 PUBLISHED: v2.0.17
@@ -230,7 +230,7 @@ HOTFIX FLOW:
                │ [2] Hotfix Finish
                │     - Tag v2.0.16.1
                │     - Publish to Maven Central
-               │     - Cherry-pick to master
+               │     - Cherry-pick to main
                │     - Delete hotfix branch
                ↓
                🎉 PUBLISHED: v2.0.16.1
@@ -245,14 +245,14 @@ HOTFIX FLOW:
 1. **Actions** → **Release Start** → Enter version → Run
 2. Review and test `release/X.Y.Z` branch
 3. **Actions** → **Release Finish** → Enter release branch → Run
-4. Done! Published to Maven Central, master updated
+4. Done! Published to Maven Central, main updated
 
 ### Create a Hotfix
 
 1. **Actions** → **Hotfix Start** → Enter version and base tag → Run
 2. Fix bug on `hotfix/X.Y.Z.W` branch
 3. **Actions** → **Hotfix Finish** → Enter hotfix branch → Run
-4. Done! Published to Maven Central, fix merged to master
+4. Done! Published to Maven Central, fix merged to main
 
 ### Check Published Versions
 
@@ -300,7 +300,7 @@ Ensure these are configured in GitHub repository settings:
 
 ### Version conflicts
 
-- Ensure master has SNAPSHOT version
+- Ensure main has SNAPSHOT version
 - Release branches should not have SNAPSHOT
 - Hotfix versions should be 4-segment (X.Y.Z.W)
 

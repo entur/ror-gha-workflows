@@ -11,7 +11,7 @@ on:
         description: 'Base branch to create release from'
         required: false
         type: string
-        default: 'master'
+        default: 'main'
 
 jobs:
   release-start:
@@ -94,7 +94,7 @@ jobs:
 
           1. Review and test the release branch
           2. Make any final adjustments if needed
-          3. When ready, merge the release branch to \`master\` to trigger the release
+          3. When ready, merge the release branch to \`main\` to trigger the release
           4. The release will be automatically published to Maven Central
-          5. The release branch will be merged back to \`develop\` automatically
+          5. The release branch will be merged back to \`main\` automatically
           EOF

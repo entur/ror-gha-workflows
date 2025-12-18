@@ -5,7 +5,7 @@ This project uses a **simplified Gitflow model** with automated Maven Central pu
 ## Branch Structure
 
 ```
-master (development)    → Active development with SNAPSHOT versions
+main (development)    → Active development with SNAPSHOT versions
   └─ 2.0.17-SNAPSHOT
 
 release/*               → Release preparation and tags
@@ -28,13 +28,13 @@ feature/*               → Feature development (optional)
 | `mvn gitflow:hotfix-start` | GitHub Actions → "Hotfix Start (Gitflow)" |
 | `mvn gitflow:hotfix-finish` | GitHub Actions → "Hotfix Finish (Gitflow)" (manual) |
 | Maven plugin | JReleaser + Entur shared workflow |
-| develop branch | master branch |
+| develop branch | main branch |
 
 ## Key Differences from Traditional Gitflow
 
-- ✅ **No separate develop branch** - master serves as development branch
+- ✅ **No separate develop branch** - main serves as development branch
 - ✅ **Simpler workflow** - Fewer branch merges
-- ✅ **SNAPSHOT versions on master** - Always ready for development
+- ✅ **SNAPSHOT versions on main** - Always ready for development
 - ✅ **Release branches** - Only for release preparation and tagging
 - ✅ **No merge back needed** - Release branches are independent
 
@@ -47,8 +47,8 @@ feature/*               → Feature development (optional)
 **Daily development workflow:**
 
 ```bash
-# Create feature branch from master (optional)
-git checkout master
+# Create feature branch from main (optional)
+git checkout main
 git pull
 git checkout -b feature/my-feature
 
@@ -57,12 +57,12 @@ git add .
 git commit -m "Add new feature"
 git push origin feature/my-feature
 
-# Create PR to master
+# Create PR to main
 # After merge, snapshot is automatically published to Maven Central
 ```
 
 **What happens:**
-- ✅ PR merged to `master`
+- ✅ PR merged to `main`
 - ✅ CI/CD runs (build, test, Sonar)
 - ✅ Snapshot published to Maven Central: `X.Y.Z-SNAPSHOT`
 
@@ -77,11 +77,11 @@ git push origin feature/my-feature
 2. Click **"Run workflow"**
 3. **Inputs:**
    - **Release version:** `2.0.17` (or leave empty to auto-remove SNAPSHOT)
-   - **Base branch:** `master` (default)
+   - **Base branch:** `main` (default)
 4. Click **"Run workflow"**
 
 **What happens:**
-1. ✅ Creates `release/2.0.17` branch from `master`
+1. ✅ Creates `release/2.0.17` branch from `main`
 2. ✅ Updates `pom.xml` version: `2.0.17-SNAPSHOT` → `2.0.17`
 3. ✅ Commits and pushes the release branch
 
@@ -104,20 +104,20 @@ git push
 2. Click **"Run workflow"**
 3. **Inputs:**
    - **Release branch:** `release/2.0.17`
-   - **Next version for master:** `2.0.18-SNAPSHOT` (auto or manual)
+   - **Next version for main:** `2.0.18-SNAPSHOT` (auto or manual)
    - **Next version increment:** `minor` (or `major`, `patch`)
 4. Click **"Run workflow"**
 
 **What happens automatically:**
 1. ✅ Creates tag: `v2.0.17` from release branch
 2. ✅ Publishes release `2.0.17` to **Maven Central**
-3. ✅ Updates `master` to next version: `2.0.18-SNAPSHOT`
+3. ✅ Updates `main` to next version: `2.0.18-SNAPSHOT`
 4. ✅ Deletes `release/2.0.17` branch
 
 **Result:**
 - 🎉 Release `2.0.17` published to Maven Central
 - 🎉 Tag `v2.0.17` created
-- 🎉 `master` ready for next iteration with `2.0.18-SNAPSHOT`
+- 🎉 `main` ready for next iteration with `2.0.18-SNAPSHOT`
 
 ---
 
@@ -158,19 +158,19 @@ git push
 2. Click **"Run workflow"**
 3. **Inputs:**
    - **Hotfix branch:** `hotfix/2.0.16.1`
-   - **Merge back to master:** `true` (default - cherry-picks the fix)
+   - **Merge back to main:** `true` (default - cherry-picks the fix)
 4. Click **"Run workflow"**
 
 **What happens automatically:**
 1. ✅ Creates tag: `v2.0.16.1` from hotfix branch
 2. ✅ Publishes hotfix `2.0.16.1` to **Maven Central**
-3. ✅ Cherry-picks hotfix commits to `master` (optional)
+3. ✅ Cherry-picks hotfix commits to `main` (optional)
 4. ✅ Deletes `hotfix/2.0.16.1` branch
 
 **Result:**
 - 🎉 Hotfix `2.0.16.1` published to Maven Central
 - 🎉 Tag `v2.0.16.1` created
-- 🎉 `master` includes the hotfix (if merge back enabled)
+- 🎉 `main` includes the hotfix (if merge back enabled)
 
 ---
 
@@ -181,7 +181,7 @@ git push
 - Automatically incremented after each release
 
 ### Release Branches
-- Created from master with SNAPSHOT removed
+- Created from main with SNAPSHOT removed
 - Example: `2.0.17-SNAPSHOT` → `2.0.17`
 - Tagged and published from release branch
 - Deleted after successful release
@@ -194,7 +194,7 @@ git push
 
 ### Automatic Version Incrementing
 
-After release, master is updated:
+After release, main is updated:
 - **minor** (default): `2.0.17` → `2.0.18-SNAPSHOT`
 - **major**: `2.0.17` → `3.0.0-SNAPSHOT`
 - **patch**: `2.0.17` → `2.0.18-SNAPSHOT` (same as minor)
@@ -225,7 +225,7 @@ RELEASE FLOW:
                ↓
                🎉 PUBLISHED TO MAVEN CENTRAL
 
-               Release Finish also updates master:
+               Release Finish also updates main:
                ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │                        MASTER BRANCH                             │
@@ -249,11 +249,11 @@ HOTFIX FLOW:
                │ Hotfix Finish (GitHub Action)
                │ - Tag v2.0.16.1
                │ - Publish to Maven Central
-               │ - Cherry-pick to master
+               │ - Cherry-pick to main
                ↓
                🎉 PUBLISHED TO MAVEN CENTRAL
 
-               Hotfix commits cherry-picked to master:
+               Hotfix commits cherry-picked to main:
                ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │                        MASTER BRANCH                             │
@@ -289,7 +289,7 @@ Actions → "Hotfix Start (Gitflow)" → Run workflow
 ```bash
 Actions → "Hotfix Finish (Gitflow)" → Run workflow
   → version: 2.0.16.1
-  → merge_to_master: true
+  → merge_to_main: true
 ```
 
 ---
@@ -337,9 +337,9 @@ Actions → "Release to Maven Central" (original workflow) → Run workflow
 If automatic cherry-pick fails:
 
 ```bash
-git checkout master
+git checkout main
 git cherry-pick <hotfix-commit-sha>
-git push origin master
+git push origin main
 ```
 
 ---
