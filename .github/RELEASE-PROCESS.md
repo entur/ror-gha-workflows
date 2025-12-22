@@ -84,8 +84,9 @@ git push
 **Result:**
 1. ✅ Tags `v2.0.17` from release branch
 2. ✅ Publishes `2.0.17` to Maven Central
-3. ✅ Updates main to `2.0.18-SNAPSHOT` (or `2.1.0-SNAPSHOT`)
-4. ✅ Deletes `release/2.0.17` branch
+3. ✅ Merges `release/2.0.17` into main
+4. ✅ Updates main to `2.0.18-SNAPSHOT` (or `2.1.0-SNAPSHOT`)
+5. ✅ Deletes `release/2.0.17` branch
 
 ---
 
@@ -178,7 +179,7 @@ git push
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MASTER BRANCH (Development)                   │
+│                     MAIN BRANCH (Development)                    │
 │                       2.0.17-SNAPSHOT                           │
 │                                                                  │
 │  ├─ feature/xyz                                                 │
@@ -199,6 +200,7 @@ git push
                │ [2] Release Finish
                │     - Tag v2.0.17
                │     - Publish to Maven Central
+               │     - Merge to main
                │     - Update main to 2.0.18-SNAPSHOT
                │     - Delete release branch
                ↓

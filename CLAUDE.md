@@ -40,6 +40,7 @@ This repository provides **reusable GitHub Actions workflows for Maven/Java proj
    - Removes `-SNAPSHOT` from pom.xml
    - Creates git tag (e.g., `v2.0.16`)
    - Publishes to Maven Central
+   - Merges release branch back to `main`
    - Updates `main` to next development version (e.g., `2.1.0-SNAPSHOT`)
    - Deletes release branch
 

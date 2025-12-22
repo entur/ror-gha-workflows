@@ -110,6 +110,7 @@ jobs:
    - Removes `-SNAPSHOT` suffix
    - Creates git tag (e.g., `v2.0.16`)
    - Publishes to Maven Central
+   - Merges release branch back to `main`
    - Updates `main` to next development version
    - Deletes release branch
 

@@ -173,9 +173,36 @@ jobs:
           gpg_secret_key: ${{ secrets.SONATYPE_GPG_KEY }}
           gpg_passphrase: ${{ secrets.SONATYPE_GPG_KEY_PASSWORD }}
 
+  merge-release-to-base:
+    name: Merge release branch to base branch
+    needs: [get-release-version, publish-release]
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch || 'main' }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge release branch
+        run: |
+          RELEASE_BRANCH="${{ inputs.release_branch }}"
+          BASE_BRANCH="${{ inputs.base_branch || 'main' }}"
+          VERSION="${{ needs.get-release-version.outputs.version }}"
+
+          echo "Merging $RELEASE_BRANCH into $BASE_BRANCH"
+          git fetch origin "$RELEASE_BRANCH"
+          git merge "origin/$RELEASE_BRANCH" -m "chore: merge release $VERSION into $BASE_BRANCH"
+          git push origin "$BASE_BRANCH"
+
   update-base-branch:
     name: Update base branch to next SNAPSHOT version
-    needs: [get-release-version, publish-release]
+    needs: [get-release-version, merge-release-to-base]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
@@ -287,7 +314,7 @@ jobs:
 
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           - **Next Development Version ($BASE_BRANCH):** ${{ steps.next_version.outputs.next_version }}
-          - **Release Branch:** Deleted
+          - **Release Branch:** Merged to $BASE_BRANCH and deleted
 
-          The release has been published to Maven Central and $BASE_BRANCH branch has been updated to the next development version.
+          The release has been published to Maven Central, merged to $BASE_BRANCH, and $BASE_BRANCH has been updated to the next development version.
           EOF
