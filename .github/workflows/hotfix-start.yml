@@ -69,8 +69,6 @@ jobs:
       - name: Calculate hotfix version
         id: calc_version
         run: |
-          chmod +x .github/scripts/next-version.sh
-
           CURRENT_VERSION="${{ steps.get_version.outputs.current_version }}"
 
           if [ -n "${{ inputs.hotfix_version }}" ]; then
