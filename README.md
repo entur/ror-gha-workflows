@@ -208,11 +208,8 @@ Your Maven project must have:
 │   ├── hotfix-finish.yml
 │   ├── release-manual.yml
 │   └── hotfix-manual.yml
-├── actions/                # Composite actions
-│   └── jreleaser-release/
-└── scripts/                # Helper scripts
-    ├── next-version.sh
-    └── update-version.sh
+└── actions/                # Composite actions
+    └── jreleaser-release/
 ```
 
 ## Documentation

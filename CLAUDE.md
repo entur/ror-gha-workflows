@@ -24,14 +24,8 @@ This repository provides **reusable GitHub Actions workflows for Maven/Java proj
 │   ├── hotfix-finish.yml      # Tag, publish, cherry-pick to main (REUSABLE)
 │   ├── release-manual.yml     # Manual release fallback
 │   └── hotfix-manual.yml      # Manual hotfix fallback
-├── actions/                    # Composite actions
-│   ├── jreleaser-release/     # Handles JReleaser config and Maven Central publishing
-│   ├── get-version/           # Extracts version from files or tags
-│   ├── update-version/        # Updates version in pom.xml
-│   └── increment-version/     # Semantic version incrementing
-└── scripts/                    # Helper scripts
-    ├── next-version.sh        # Calculate next semantic version
-    └── update-version.sh      # Update Maven pom.xml versions
+└── actions/                    # Composite actions
+    └── jreleaser-release/     # Handles JReleaser config and Maven Central publishing
 ```
 
 ## Gitflow Workflow Process
@@ -207,32 +201,6 @@ The workflows use the local `.github/actions/jreleaser-release` composite action
 - `JRELEASER_OVERWRITE`: true
 - `JRELEASER_UPDATE`: true
 - `JRELEASER_GIT_ROOT_SEARCH`: true
-
-## Helper Scripts
-
-### `.github/scripts/next-version.sh`
-
-Calculates the next semantic version based on increment type.
-
-```bash
-.github/scripts/next-version.sh "2.0.16" "minor"
-# Output: 2.1.0-SNAPSHOT
-
-.github/scripts/next-version.sh "2.0.16" "major"
-# Output: 3.0.0-SNAPSHOT
-
-.github/scripts/next-version.sh "2.0.16" "patch"
-# Output: 2.0.17-SNAPSHOT
-```
-
-### `.github/scripts/update-version.sh`
-
-Updates Maven pom.xml versions using `mvn versions:set`.
-
-```bash
-.github/scripts/update-version.sh "2.1.0-SNAPSHOT"
-# Updates all pom.xml files in the project
-```
 
 ## Troubleshooting
 

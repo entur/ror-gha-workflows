@@ -26,13 +26,6 @@ This solution replaces the traditional **gitflow-maven-plugin** approach with Gi
 | `.github/workflows/release.yml` | Fallback manual release (legacy) | Tag push or manual |
 | `.github/workflows/release-hotfix.yml` | Fallback manual hotfix (legacy) | Tag push or manual |
 
-### Helper Scripts
-
-| File | Purpose |
-|------|---------|
-| `.github/scripts/update-version.sh` | Update version in pom.xml using Maven |
-| `.github/scripts/next-version.sh` | Calculate next version (major/minor/patch) |
-
 ## Complete Release Workflow
 
 ###1. Normal Development (Master Branch)
