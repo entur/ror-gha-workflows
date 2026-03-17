@@ -107,7 +107,7 @@ jobs:
 
           mvn -B versions:set -DnewVersion="$HOTFIX_VERSION" -DgenerateBackupPoms=false -DprocessAllModules=true
 
-          git add '*/pom.xml' pom.xml
+          git add $(find . -name "pom.xml" | sort)
           git commit -m "chore: prepare hotfix $HOTFIX_VERSION"
 
       - name: Push hotfix branch

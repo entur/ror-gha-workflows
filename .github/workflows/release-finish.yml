@@ -276,7 +276,7 @@ jobs:
 
           mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false -DprocessAllModules=true
 
-          git add '*/pom.xml' pom.xml
+          git add $(find . -name "pom.xml" | sort)
           git commit -m "chore: prepare for next development iteration $NEXT_VERSION [skip ci]"
           git push origin "$BASE_BRANCH"
 
