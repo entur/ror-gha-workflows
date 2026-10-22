@@ -81,12 +81,12 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.hotfix_branch }}
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: ${{ inputs.java_version || 21 }}
           distribution: ${{ inputs.java_distribution || 'liberica' }}
@@ -105,7 +105,7 @@ jobs:
     needs: get-hotfix-version
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.hotfix_branch }}
           fetch-depth: 0
@@ -139,18 +139,18 @@ jobs:
       JRELEASER_UPDATE: true
       JRELEASER_GIT_ROOT_SEARCH: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.version_tag_prefix || 'v' }}${{ needs.get-hotfix-version.outputs.version }}
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: ${{ inputs.java_version || 21 }}
           distribution: ${{ inputs.java_distribution || 'liberica' }}
 
       - name: JReleaser Release to Maven Central
-        uses: entur/ror-gha-workflows/.github/actions/jreleaser-release@v1
+        uses: entur/ror-gha-workflows/.github/actions/jreleaser-release@v1.2.0
         with:
           version: ${{ needs.get-hotfix-version.outputs.version }}
           version_tag_prefix: ${{ inputs.version_tag_prefix || 'v' }}
@@ -167,7 +167,7 @@ jobs:
     if: inputs.merge_to_main == true
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.base_branch || 'main' }}
           fetch-depth: 0
