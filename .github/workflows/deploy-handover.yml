@@ -1,0 +1,303 @@
+name: RoR/Deploy/Handover
+
+# Deploys an image built in a public app repo (entur/<app>) from its internal
+# deployment-config repo, as described in entur/ror-tasks#45. The caller owns
+# the triggers, Approve environment, Slack secret and helm/<app> chart:
+#
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         run_id: { type: string, required: false }
+#         image_tag: { type: string, required: false }
+#     push:
+#       branches: [main]
+#       paths: [".github/workflows/deploy.yml", "helm/**"]
+#     pull_request:
+#       paths: [".github/workflows/deploy.yml", "helm/**"]
+#   jobs:
+#     deploy:
+#       # What the called workflows ask for (scan, push, deploy).
+#       permissions:
+#         actions: read
+#         contents: write
+#         id-token: write
+#         issues: write
+#         pull-requests: write
+#         security-events: write
+#       uses: entur/ror-gha-workflows/.github/workflows/deploy-handover.yml@<sha> # vX.Y.Z
+#       with:
+#         app: poiman
+#         run_id: ${{ inputs.run_id }}
+#         image_tag: ${{ inputs.image_tag }}
+#       secrets: inherit
+#
+# Three ways in:
+#   run_id     the <app> build run on main: copy its image artifact, scan it,
+#              push it to GAR, deploy it
+#   image_tag  redeploy an image already in GAR, e.g. a rollback
+#   neither    (helm push) deploy <app> main's image; fails if it isn't in
+#              GAR yet, never falls back to an older image
+# Pull requests only lint the chart.
+#
+# <app> must be public: the caller's own GITHUB_TOKEN reads its runs and
+# downloads its artifact.
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: "Repo, image, chart (helm/<app>), namespace and release name"
+        type: string
+        required: true
+      run_id:
+        description: "<app> build run on main whose image to push and deploy"
+        type: string
+        default: ""
+      image_tag:
+        description: "Image already in GAR to deploy, e.g. main.20261103-SHAabc1234"
+        type: string
+        default: ""
+      source_workflow:
+        description: "Workflow in <app> that builds the image"
+        type: string
+        default: ".github/workflows/build.yml"
+      environments:
+        description: "Where to deploy: 'dev' or 'dev,tst,prd'"
+        type: string
+        default: "dev,tst,prd"
+    secrets:
+      SLACK_WEBHOOK_URL:
+        description: "Incoming webhook for failure alerts (passed with secrets: inherit)"
+        required: false
+
+# No workflow-level lock: a run waiting for approval must not block newer
+# runs. A newer run reaching an approval cancels an older run waiting at the
+# same approval; helm deploys are serialized per env and never cancelled.
+
+jobs:
+  helm-lint:
+    uses: entur/gha-helm/.github/workflows/lint.yml@080c3d42794f3be06b42e3a81ff23a3a0e3b0235 # v2.1.0
+    with:
+      environment: dev
+      chart: helm/${{ inputs.app }}
+
+  # Tags are named after the <app> commit (committer date and sha).
+  resolve:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      handover: ${{ steps.resolve.outputs.handover }}
+    steps:
+      # GAR read for the helm-only path.
+      - if: inputs.run_id == '' && inputs.image_tag == ''
+        uses: entur/gha-meta/.github/actions/docker-auth@c3ca051ef943942321084a21ec919bc8097dfd92 # v1.9.1
+        with:
+          cloud_provider: gcp
+          gcp_workload_identity_provider: ${{ vars.CI_WORKLOAD_IDENTITY_PROVIDER }}
+          gcp_service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ inputs.app }}
+          RUN_ID: ${{ inputs.run_id }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          SOURCE_WORKFLOW: ${{ inputs.source_workflow }}
+          ENVIRONMENTS: ${{ inputs.environments }}
+        run: |
+          summary() {
+            {
+              echo "### Deploy $APP:$1"
+              echo
+              echo "$2"
+              echo
+              if [[ "$ENVIRONMENTS" == *tst* ]]; then
+                echo "Environments: $ENVIRONMENTS; tst and prd wait for Approve."
+              else
+                echo "Environments: $ENVIRONMENTS."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+          if ! [[ "$APP" =~ ^[a-z0-9-]+$ ]]; then
+            echo "::error::app must be a repo name like poiman"
+            exit 1
+          fi
+          if [ -n "$RUN_ID" ] && [ -n "$IMAGE_TAG" ]; then
+            echo "::error::give run_id or image_tag, not both"
+            exit 1
+          fi
+          if [ -n "$IMAGE_TAG" ]; then
+            if ! [[ "$IMAGE_TAG" =~ ^main\.[0-9]{8}-SHA[0-9a-f]{7}$ ]]; then
+              echo "::error::image_tag must look like main.20261103-SHAabc1234"
+              exit 1
+            fi
+            echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+            echo "handover=false" >> "$GITHUB_OUTPUT"
+            summary "$IMAGE_TAG" "Redeploy of an image already in GAR (\`image_tag\`)."
+            exit 0
+          fi
+          if [ -n "$RUN_ID" ]; then
+            if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+              echo "::error::run_id must be a number"
+              exit 1
+            fi
+            run=$(gh api "repos/entur/$APP/actions/runs/$RUN_ID")
+            ok=$(jq -r --arg repo "entur/$APP" --arg path "$SOURCE_WORKFLOW" \
+              '.repository.full_name == $repo and .head_repository.full_name == $repo
+              and .event == "push" and .head_branch == "main" and .path == $path
+              and (.conclusion == null or .conclusion == "success")' <<<"$run")
+            if [ "$ok" != true ]; then
+              echo "::error::run $RUN_ID is not a running or successful push to entur/$APP main by $SOURCE_WORKFLOW"
+              exit 1
+            fi
+            sha=$(jq -r .head_sha <<<"$run")
+            date=$(gh api "repos/entur/$APP/commits/$sha" -q .commit.committer.date | cut -c1-10 | tr -d -)
+            handover=true
+            how="Handover from [$APP run $RUN_ID](https://github.com/entur/$APP/actions/runs/$RUN_ID): scan, push to GAR, deploy."
+          else
+            sha=$(git ls-remote "https://github.com/entur/$APP.git" refs/heads/main | cut -f1)
+            date=$(gh api "repos/entur/$APP/commits/$sha" -q .commit.committer.date | cut -c1-10 | tr -d -)
+            tag=main.$date-SHA${sha:0:7}
+            if ! docker buildx imagetools inspect "eu.gcr.io/entur-system-1287/$APP:$tag" > /dev/null 2>&1; then
+              echo "::error::$APP main's image $tag isn't in GAR yet: wait for its deploy run, or dispatch with image_tag"
+              exit 1
+            fi
+            handover=false
+            how="Helm-only change: redeploy $APP main's image, already in GAR."
+          fi
+          summary "main.$date-SHA${sha:0:7}" "$how Commit: [${sha:0:7}](https://github.com/entur/$APP/commit/$sha)."
+          {
+            echo "sha=$sha"
+            echo "tag=main.$date-SHA${sha:0:7}"
+            echo "handover=$handover"
+          } >> "$GITHUB_OUTPUT"
+
+  # Copies the image artifact from the <app> run into this run, where
+  # docker-scan and push.yml read it.
+  fetch:
+    needs: resolve
+    if: needs.resolve.outputs.handover == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: ${{ inputs.app }}
+          repository: entur/${{ inputs.app }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: /tmp
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.app }}
+          path: /tmp/${{ inputs.app }}.tar
+          retention-days: 1
+
+  scan:
+    needs: fetch
+    uses: entur/gha-security/.github/workflows/docker-scan.yml@0962fb4f3f9004eeaea88582db8639e140ec6fda # v2.17.1
+    with:
+      image_artifact: ${{ inputs.app }}
+
+  docker-push:
+    needs: [resolve, fetch, scan]
+    uses: entur/gha-docker/.github/workflows/push.yml@a1d476b895a271d0fe8557f1b763529b64fb0554 # v1.14.0
+    with:
+      image_name: ${{ inputs.app }}
+      image_tag: ${{ needs.resolve.outputs.tag }}
+      git_tag: false
+
+  # Without a handover docker-push is skipped and the image is already in GAR;
+  # with one, the push must have succeeded.
+  deploy-dev:
+    needs: [helm-lint, resolve, docker-push]
+    if: ${{ !cancelled() && needs.helm-lint.result == 'success' && needs.resolve.result == 'success' && (needs.resolve.outputs.handover == 'true' && needs.docker-push.result == 'success' || needs.resolve.outputs.handover == 'false' && needs.docker-push.result == 'skipped') }}
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    uses: entur/gha-helm/.github/workflows/deploy.yml@080c3d42794f3be06b42e3a81ff23a3a0e3b0235 # v2.1.0
+    with:
+      environment: dev
+      image: ${{ inputs.app }}:${{ needs.resolve.outputs.tag }}
+      chart: helm/${{ inputs.app }}
+      namespace: ${{ inputs.app }}
+      release_name: ${{ inputs.app }}
+    secrets: inherit
+
+  approval-tst:
+    concurrency:
+      group: approval-tst
+      cancel-in-progress: true
+    needs: deploy-dev
+    if: ${{ !cancelled() && needs.deploy-dev.result == 'success' && contains(inputs.environments, 'tst') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: Approve
+    steps:
+      - run: echo "Approve TST deployment"
+
+  deploy-tst:
+    needs: [resolve, approval-tst]
+    if: ${{ !cancelled() && needs.approval-tst.result == 'success' }}
+    concurrency:
+      group: deploy-tst
+      cancel-in-progress: false
+    uses: entur/gha-helm/.github/workflows/deploy.yml@080c3d42794f3be06b42e3a81ff23a3a0e3b0235 # v2.1.0
+    with:
+      environment: tst
+      image: ${{ inputs.app }}:${{ needs.resolve.outputs.tag }}
+      chart: helm/${{ inputs.app }}
+      namespace: ${{ inputs.app }}
+      release_name: ${{ inputs.app }}
+    secrets: inherit
+
+  approval-prd:
+    concurrency:
+      group: approval-prd
+      cancel-in-progress: true
+    needs: deploy-tst
+    if: ${{ !cancelled() && needs.deploy-tst.result == 'success' && contains(inputs.environments, 'prd') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: Approve
+    steps:
+      - run: echo "Approve PRD deployment"
+
+  deploy-prd:
+    needs: [resolve, approval-prd]
+    if: ${{ !cancelled() && needs.approval-prd.result == 'success' }}
+    concurrency:
+      group: deploy-prd
+      cancel-in-progress: false
+    uses: entur/gha-helm/.github/workflows/deploy.yml@080c3d42794f3be06b42e3a81ff23a3a0e3b0235 # v2.1.0
+    with:
+      environment: prd
+      image: ${{ inputs.app }}:${{ needs.resolve.outputs.tag }}
+      chart: helm/${{ inputs.app }}
+      namespace: ${{ inputs.app }}
+      release_name: ${{ inputs.app }}
+    secrets: inherit
+
+  # Direct needs only, so a rejected approval doesn't alert.
+  notify-slack:
+    needs: [helm-lint, resolve, fetch, scan, docker-push, deploy-dev, deploy-tst, deploy-prd]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - if: env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "*${{ github.workflow }}* ${{ inputs.app }} ${{ needs.resolve.outputs.tag || 'main' }} failed: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run>"
