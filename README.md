@@ -208,6 +208,9 @@ the workflow for the caller, and [entur/ror-tasks#45](https://github.com/entur/r
 for the setup it assumes. The caller needs a `SLACK_WEBHOOK_URL` secret for
 failure alerts and passes it with `secrets: inherit`.
 
+`handover-image.yml` is the first half on its own: it picks the image and gets
+it into GAR, for callers with their own deploy steps (geocoder).
+
 ## Repository Structure
 
 ```
@@ -219,7 +222,8 @@ failure alerts and passes it with `secrets: inherit`.
 │   ├── hotfix-finish.yml
 │   ├── release-manual.yml
 │   ├── hotfix-manual.yml
-│   └── deploy-handover.yml
+│   ├── deploy-handover.yml
+│   └── handover-image.yml
 └── actions/                # Composite actions
     └── jreleaser-release/
 ```

@@ -1,0 +1,217 @@
+name: RoR/Deploy/Handover image
+
+# Takes over an image built in a public app repo (entur/<app>), as described
+# in entur/ror-tasks#45, and makes sure it is in GAR. deploy-handover.yml uses
+# it; call it directly when the deploy steps are your own (geocoder):
+#
+#   jobs:
+#     image:
+#       if: github.event_name != 'pull_request'
+#       # What the called workflows ask for (scan, push).
+#       permissions:
+#         actions: read
+#         contents: write
+#         id-token: write
+#         issues: write
+#         pull-requests: write
+#         security-events: write
+#       uses: entur/ror-gha-workflows/.github/workflows/handover-image.yml@<sha> # vX.Y.Z
+#       with:
+#         app: geocoder
+#         image: geocoder-proxy
+#         source_workflow: .github/workflows/proxy.yml
+#         run_id: ${{ inputs.run_id }}
+#         image_tag: ${{ inputs.image_tag }}
+#       secrets: inherit
+#     deploy-dev:
+#       needs: image
+#       ... image: geocoder-proxy:${{ needs.image.outputs.tag }}
+#
+# Three ways in:
+#   run_id     the <app> build run on main: copy its image artifact, scan it,
+#              push it to GAR
+#   image_tag  an image already in GAR, e.g. a rollback
+#   neither    (helm push) the image from <app>'s latest build run on main;
+#              fails if that run is unfinished or failed, or its image isn't in
+#              GAR, never falls back to an older image
+#
+# <app> must be public: the caller's own GITHUB_TOKEN reads its runs and
+# downloads its artifact. The artifact is named after the image and holds
+# <image>.tar.
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: "Public repo that builds the image"
+        type: string
+        required: true
+      image:
+        description: "Image name (default: app)"
+        type: string
+        default: ""
+      run_id:
+        description: "<app> build run on main whose image to push"
+        type: string
+        default: ""
+      image_tag:
+        description: "Image already in GAR, e.g. main.20261103-SHAabc1234"
+        type: string
+        default: ""
+      source_workflow:
+        description: "Workflow in <app> that builds the image"
+        type: string
+        default: ".github/workflows/build.yml"
+    outputs:
+      sha:
+        description: "<app> commit (empty for image_tag)"
+        value: ${{ jobs.resolve.outputs.sha }}
+      tag:
+        description: "Image tag in GAR, e.g. main.20261103-SHAabc1234"
+        value: ${{ jobs.resolve.outputs.tag }}
+
+jobs:
+  # Tags are named after the <app> commit (committer date and sha).
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      image: ${{ steps.resolve.outputs.image }}
+      handover: ${{ steps.resolve.outputs.handover }}
+    steps:
+      # GAR read for the helm-only path.
+      - if: inputs.run_id == '' && inputs.image_tag == ''
+        uses: entur/gha-meta/.github/actions/docker-auth@c3ca051ef943942321084a21ec919bc8097dfd92 # v1.9.1
+        with:
+          cloud_provider: gcp
+          gcp_workload_identity_provider: ${{ vars.CI_WORKLOAD_IDENTITY_PROVIDER }}
+          gcp_service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ inputs.app }}
+          IMAGE: ${{ inputs.image || inputs.app }}
+          RUN_ID: ${{ inputs.run_id }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          SOURCE_WORKFLOW: ${{ inputs.source_workflow }}
+        run: |
+          summary() {
+            {
+              echo "### $IMAGE:$1"
+              echo
+              echo "$2"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+          if ! [[ "$APP" =~ ^[a-z0-9-]+$ && "$IMAGE" =~ ^[a-z0-9-]+$ ]]; then
+            echo "::error::app and image must be names like poiman"
+            exit 1
+          fi
+          if ! [[ "$SOURCE_WORKFLOW" =~ ^\.github/workflows/[A-Za-z0-9._-]+\.ya?ml$ ]]; then
+            echo "::error::source_workflow must look like .github/workflows/build.yml"
+            exit 1
+          fi
+          if [ -n "$RUN_ID" ] && [ -n "$IMAGE_TAG" ]; then
+            echo "::error::give run_id or image_tag, not both"
+            exit 1
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          if [ -n "$IMAGE_TAG" ]; then
+            # The time part is in tags geocoder built before the handover.
+            if ! [[ "$IMAGE_TAG" =~ ^main\.[0-9]{8}(-[0-9]{6})?-SHA[0-9a-f]{7}$ ]]; then
+              echo "::error::image_tag must look like main.20261103-SHAabc1234"
+              exit 1
+            fi
+            echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+            echo "handover=false" >> "$GITHUB_OUTPUT"
+            summary "$IMAGE_TAG" "Image already in GAR (\`image_tag\`)."
+            exit 0
+          fi
+          run_id=$RUN_ID
+          if [ -n "$RUN_ID" ]; then
+            if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+              echo "::error::run_id must be a number"
+              exit 1
+            fi
+            run=$(gh api "repos/entur/$APP/actions/runs/$RUN_ID")
+          else
+            run=$(gh api "repos/entur/$APP/actions/workflows/${SOURCE_WORKFLOW##*/}/runs?branch=main&event=push&per_page=1" -q '.workflow_runs[0]')
+            if [ -z "$run" ] || [ "$run" = null ]; then
+              echo "::error::entur/$APP has no $SOURCE_WORKFLOW run on main"
+              exit 1
+            fi
+            run_id=$(jq -r .id <<<"$run")
+          fi
+          ok=$(jq -r --arg repo "entur/$APP" --arg path "$SOURCE_WORKFLOW" \
+            '.repository.full_name == $repo and .head_repository.full_name == $repo
+            and .event == "push" and .head_branch == "main" and .path == $path
+            and (.conclusion == null or .conclusion == "success")' <<<"$run")
+          if [ "$ok" != true ]; then
+            echo "::error::run $run_id is not a running or successful push to entur/$APP main by $SOURCE_WORKFLOW"
+            exit 1
+          fi
+          sha=$(jq -r .head_sha <<<"$run")
+          date=$(gh api "repos/entur/$APP/commits/$sha" -q .commit.committer.date | cut -c1-10 | tr -d -)
+          tag=main.$date-SHA${sha:0:7}
+          run_link="[$APP run $run_id](https://github.com/entur/$APP/actions/runs/$run_id)"
+          commit_link="[${sha:0:7}](https://github.com/entur/$APP/commit/$sha)"
+          if [ -n "$RUN_ID" ]; then
+            handover=true
+            summary "$tag" "Handover from $run_link: scan, push to GAR. Commit: $commit_link."
+          else
+            if [ "$(jq -r .conclusion <<<"$run")" != success ]; then
+              echo "::error::entur/$APP's latest $SOURCE_WORKFLOW run on main ($run_id) hasn't finished: wait for it and its deploy run"
+              exit 1
+            fi
+            if ! docker buildx imagetools inspect "eu.gcr.io/entur-system-1287/$IMAGE:$tag" > /dev/null 2>&1; then
+              echo "::error::$IMAGE:$tag from $APP run $run_id isn't in GAR: check that run's deploy, or dispatch with image_tag"
+              exit 1
+            fi
+            handover=false
+            summary "$tag" "Helm-only change: the image from $APP's latest build on main ($run_link), already in GAR. Commit: $commit_link."
+          fi
+          {
+            echo "sha=$sha"
+            echo "tag=$tag"
+            echo "handover=$handover"
+          } >> "$GITHUB_OUTPUT"
+
+  # Copies the image artifact from the <app> run into this run, where
+  # docker-scan and push.yml read it.
+  fetch:
+    needs: resolve
+    if: needs.resolve.outputs.handover == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: ${{ needs.resolve.outputs.image }}
+          repository: entur/${{ inputs.app }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: /tmp
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.resolve.outputs.image }}
+          path: /tmp/${{ needs.resolve.outputs.image }}.tar
+          retention-days: 1
+
+  scan:
+    needs: [resolve, fetch]
+    uses: entur/gha-security/.github/workflows/docker-scan.yml@0962fb4f3f9004eeaea88582db8639e140ec6fda # v2.17.1
+    with:
+      image_artifact: ${{ needs.resolve.outputs.image }}
+
+  docker-push:
+    needs: [resolve, fetch, scan]
+    uses: entur/gha-docker/.github/workflows/push.yml@a1d476b895a271d0fe8557f1b763529b64fb0554 # v1.14.0
+    with:
+      image_name: ${{ needs.resolve.outputs.image }}
+      image_tag: ${{ needs.resolve.outputs.tag }}
+      git_tag: false
