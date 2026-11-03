@@ -198,6 +198,16 @@ Your Maven project must have:
 
 2. **Maven Central deployment configuration** in your publication profile
 
+## Deploy handover
+
+`deploy-handover.yml` deploys an image built in a public app repo from its
+internal `<app>-deployment-config` repo: it checks the app's build run, copies
+its image artifact, scans it, pushes it to GAR and deploys it through dev, tst
+and prd with the caller's `Approve` environment. See the comment at the top of
+the workflow for the caller, and [entur/ror-tasks#45](https://github.com/entur/ror-tasks/issues/45)
+for the setup it assumes. The caller needs a `SLACK_WEBHOOK_URL` secret for
+failure alerts and passes it with `secrets: inherit`.
+
 ## Repository Structure
 
 ```
@@ -208,7 +218,8 @@ Your Maven project must have:
 │   ├── hotfix-start.yml
 │   ├── hotfix-finish.yml
 │   ├── release-manual.yml
-│   └── hotfix-manual.yml
+│   ├── hotfix-manual.yml
+│   └── deploy-handover.yml
 └── actions/                # Composite actions
     └── jreleaser-release/
 ```
