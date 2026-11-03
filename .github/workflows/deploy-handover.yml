@@ -16,6 +16,14 @@ name: RoR/Deploy/Handover
 #       paths: [".github/workflows/deploy.yml", "helm/**"]
 #   jobs:
 #     deploy:
+#       # What the called workflows ask for (scan, push, deploy).
+#       permissions:
+#         actions: read
+#         contents: write
+#         id-token: write
+#         issues: write
+#         pull-requests: write
+#         security-events: write
 #       uses: entur/ror-gha-workflows/.github/workflows/deploy-handover.yml@<sha> # vX.Y.Z
 #       with:
 #         app: poiman
@@ -30,6 +38,9 @@ name: RoR/Deploy/Handover
 #   neither    (helm push) deploy <app> main's image; fails if it isn't in
 #              GAR yet, never falls back to an older image
 # Pull requests only lint the chart.
+#
+# <app> must be public: the caller's own GITHUB_TOKEN reads its runs and
+# downloads its artifact.
 
 on:
   workflow_call:
@@ -137,9 +148,10 @@ jobs:
             run=$(gh api "repos/entur/$APP/actions/runs/$RUN_ID")
             ok=$(jq -r --arg repo "entur/$APP" --arg path "$SOURCE_WORKFLOW" \
               '.repository.full_name == $repo and .head_repository.full_name == $repo
-              and .event == "push" and .head_branch == "main" and .path == $path' <<<"$run")
+              and .event == "push" and .head_branch == "main" and .path == $path
+              and (.conclusion == null or .conclusion == "success")' <<<"$run")
             if [ "$ok" != true ]; then
-              echo "::error::run $RUN_ID is not a push to entur/$APP main by $SOURCE_WORKFLOW"
+              echo "::error::run $RUN_ID is not a running or successful push to entur/$APP main by $SOURCE_WORKFLOW"
               exit 1
             fi
             sha=$(jq -r .head_sha <<<"$run")
