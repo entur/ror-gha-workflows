@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/entur/ror-gha-workflows/compare/v1.4.0...v1.4.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* let release-please own releases so v1 moves ([#4](https://github.com/entur/ror-gha-workflows/issues/4)) ([288edde](https://github.com/entur/ror-gha-workflows/commit/288eddee190bf79598a1be6931efe7d890472274))
+
 ## [1.4.0](https://github.com/entur/ror-gha-workflows/compare/v1.3.0...v1.4.0) (2026-11-03)
 
 
