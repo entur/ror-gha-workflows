@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/entur/ror-gha-workflows/compare/v1.4.1...v1.4.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* call handover-image by full path so deploy-handover works on [@v1](https://github.com/v1) ([#6](https://github.com/entur/ror-gha-workflows/issues/6)) ([62ea1fd](https://github.com/entur/ror-gha-workflows/commit/62ea1fdc62edc727ca8b46a479c0001cad5a61b4))
+
 ## [1.4.1](https://github.com/entur/ror-gha-workflows/compare/v1.4.0...v1.4.1) (2026-11-10)
 
 
