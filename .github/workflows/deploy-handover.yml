@@ -24,7 +24,7 @@ name: RoR/Deploy/Handover
 #         issues: write
 #         pull-requests: write
 #         security-events: write
-#       uses: entur/ror-gha-workflows/.github/workflows/deploy-handover.yml@<sha> # vX.Y.Z
+#       uses: entur/ror-gha-workflows/.github/workflows/deploy-handover.yml@v1
 #       with:
 #         app: poiman
 #         run_id: ${{ inputs.run_id }}
@@ -84,7 +84,7 @@ jobs:
       issues: write
       pull-requests: write
       security-events: write
-    uses: ./.github/workflows/handover-image.yml
+    uses: entur/ror-gha-workflows/.github/workflows/handover-image.yml@v1
     with:
       app: ${{ inputs.app }}
       run_id: ${{ inputs.run_id }}
