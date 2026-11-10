@@ -280,6 +280,10 @@ git push origin :refs/tags/v2.0.16
 - **Maven**: 3.6+
 - **JReleaser**: 1.x
 
+## Versioning
+
+Releases come from release-please (`cd.yml`). Merging its release PR tags `vX.Y.Z` and moves `vX` and `vX.Y` to the same commit, so callers can use `@v1`. Don't push version tags by hand: release-please then fails on the existing tag, and `v1` stays behind.
+
 ## License
 
 [Add your license here]

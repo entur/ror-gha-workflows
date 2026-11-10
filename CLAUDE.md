@@ -296,7 +296,7 @@ When modifying workflows:
 1. Test with `workflow_dispatch` in a test repository first
 2. Verify all parameterization works correctly
 3. Update this documentation to reflect changes
-4. Tag a new version of this repository for stable references
+4. Release by merging the release-please PR, which also moves `v1`; never push version tags by hand
 
 ### Version Compatibility
 
